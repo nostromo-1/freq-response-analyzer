@@ -77,6 +77,8 @@ void setup() {
   display.begin();
   AD.begin();
   AD.setOutputMode(OUTPUT_MODE_SINE);
+  AD.setSignOutput(SIGN_OUTPUT_MSB);
+  
 
   Vcc = readVcc();  // Read power supply voltage level (mV), for ADC reference
   Serial.print("Board power supply voltage: "); Serial.print(Vcc/1000.0f); Serial.println(" V");
@@ -103,8 +105,8 @@ void setup() {
   PORTD |= encoderPins;  // Turn on pullup resistors in encoder0PinA and encoder0PinB
   DDRD &= ~_BV(pushButton);   // Set PD5 as input (push button)
   PORTD |= _BV(pushButton);   // Turn on pullup resistor in PD5
-  EICRA = _BV(ISC00);  // sense any change on the INT0 pin
-  EIMSK = _BV(INT0);   // enable INT0 interrupt
+  EICRA = _BV(ISC01);   // The falling edge of INT0 generates an interrupt request 
+  EIMSK = _BV(INT0);    // enable INT0 interrupt
   delay(1000); // Wait for the pullup resistor to settle and for the peak detector to stabilize at null amplifier output
 
   // Read input voltage with no signal applied to amplifier, ie, base DC level of peak detector
@@ -120,13 +122,12 @@ void setup() {
 
   if (mode == SINGLE) encoderVal = 1000;  // Initial frequency for generator
   else {
-    adjust_input();
+    adjust_input();   // Oscilloscope mode
     bank = 1 - bank;
-    AD.setFrequency(bank, float(f0));
+    AD.setFrequency(bank, float(f0));  // Set initial frequency for sweep
     AD.selectFrequency(bank);
     delay(300);    
     }
-
 }
 
 
@@ -181,11 +182,10 @@ void loop() {
     draw_advance(freq);
     previousMillis = currentMillis;
   }
-
 }
 
 
-
+// Oscilloscope mode. Useful to check that the sine wave does not clip and level is OK
 void adjust_input(void)
 {
   uint8_t i, v1, v2, samples_count;
@@ -225,7 +225,7 @@ void adjust_input(void)
     samples[samples_count++] = v2;    
     while (samples_count < n_samples) {
       samples[samples_count++] = uint8_t(analogRead(SCOPEPORT)>>2);
-    };
+    }
 
     // Put samples on display, only dots
     display.firstPage();
@@ -255,8 +255,8 @@ void adjust_input(void)
 }
 
 
-
-void draw_advance(unsigned f)
+// Draw an indication of sweep advance on display
+void draw_advance(long f)
 {
   uint8_t x;
 
@@ -279,6 +279,7 @@ void draw_advance(unsigned f)
 }
 
 
+// Draw the frequency response curve
 void draw_freq_response(int samples_count)
 {
   uint8_t x, y, Vpmax, max_sample;
